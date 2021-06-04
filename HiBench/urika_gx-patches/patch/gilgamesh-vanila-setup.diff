@@ -1,0 +1,81 @@
+diff --git a/bin/functions/workload_functions.sh b/bin/functions/workload_functions.sh
+index 3055d53..9711f1c 100644
+--- a/bin/functions/workload_functions.sh
++++ b/bin/functions/workload_functions.sh
+@@ -213,6 +213,15 @@ function run_spark_job() {
+            YARN_OPTS="${YARN_OPTS} --driver-memory ${SPARK_YARN_DRIVER_MEMORY}"
+        fi
+     fi
++    if [[ "$SPARK_MASTER" == mesos* ]]; then
++        YARN_OPTS="--total-executor-cores ${YARN_EXECUTOR_CORES}"
++       if [[ -n "${SPARK_YARN_EXECUTOR_MEMORY:-}" ]]; then
++           YARN_OPTS="${YARN_OPTS} --executor-memory ${SPARK_YARN_EXECUTOR_MEMORY}"
++       fi
++       if [[ -n "${SPAKR_YARN_DRIVER_MEMORY:-}" ]]; then
++           YARN_OPTS="${YARN_OPTS} --driver-memory ${SPARK_YARN_DRIVER_MEMORY}"
++       fi
++    fi
+     if [[ "$CLS" == *.py ]]; then 
+         LIB_JARS="$LIB_JARS --jars ${SPARKBENCH_JAR}"
+         SUBMIT_CMD="${SPARK_HOME}/bin/spark-submit ${LIB_JARS} --properties-file ${SPARK_PROP_CONF} --master ${SPARK_MASTER} ${YARN_OPTS} ${CLS} $@"
+diff --git a/conf/benchmarks.lst b/conf/benchmarks.lst
+index f8b8fed..81bc314 100644
+--- a/conf/benchmarks.lst
++++ b/conf/benchmarks.lst
+@@ -1,20 +1,16 @@
+ micro.sleep
+ micro.sort
+-micro.terasort
+ micro.wordcount
+-micro.dfsioe
+ 
+ sql.aggregation
+ sql.join
+ sql.scan
+ 
+-websearch.nutchindexing
+ websearch.pagerank
+ 
+ ml.bayes
+ ml.kmeans
+ ml.lr
+-ml.als
+ ml.pca
+ ml.gbt
+ ml.rf
+@@ -23,4 +19,4 @@ ml.linear
+ ml.lda
+ ml.svm
+ 
+-graph.nweight
+\ No newline at end of file
++graph.nweight
+diff --git a/conf/frameworks.lst b/conf/frameworks.lst
+index 32ecfe2..53ece11 100644
+--- a/conf/frameworks.lst
++++ b/conf/frameworks.lst
+@@ -1,2 +1 @@
+-hadoop
+ spark
+\ No newline at end of file
+diff --git a/conf/hibench.conf b/conf/hibench.conf
+index 5316e4d..6bc5d1d 100644
+--- a/conf/hibench.conf
++++ b/conf/hibench.conf
+@@ -1,6 +1,6 @@
+ # Data scale profile. Available value is tiny, small, large, huge, gigantic and bigdata.
+ # The definition of these profiles can be found in the workload's conf file i.e. conf/workloads/micro/wordcount.conf
+-hibench.scale.profile                tiny
++hibench.scale.profile                gigantic
+ # Mapper number in hadoop, partition number in Spark
+ hibench.default.map.parallelism         8
+ 
+@@ -31,7 +31,7 @@ hibench.configure.dir		${hibench.home}/conf
+ hibench.hdfs.data.dir		${hibench.hdfs.master}/HiBench
+ 
+ # path of hibench jars
+-hibench.hibench.datatool.dir	          ${hibench.home}/autogen/target/autogen-7.1-SNAPSHOT-jar-with-dependencies.jar
++hibench.hibench.datatool.dir            ${hibench.home}/autogen/target/autogen-7.1-SNAPSHOT-jar-with-dependencies.jar
+ hibench.common.jar                      ${hibench.home}/common/target/hibench-common-7.1-SNAPSHOT-jar-with-dependencies.jar
+ hibench.sparkbench.jar                  ${hibench.home}/sparkbench/assembly/target/sparkbench-assembly-7.1-SNAPSHOT-dist.jar
+ hibench.streambench.stormbench.jar      ${hibench.home}/stormbench/streaming/target/stormbench-streaming-7.1-SNAPSHOT.jar
