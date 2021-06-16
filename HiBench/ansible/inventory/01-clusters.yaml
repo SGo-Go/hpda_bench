@@ -1,0 +1,8 @@
+---
+HLRS:
+  hosts:
+    vulcan:
+      ansible_host: vulcan.hww.hlrs.de
+  vars:
+    hibench_prefix: ~/hpda/{{ inventory_hostname }}/HiBench
+    use_workspace: true

@@ -1,0 +1,70 @@
+#+TITLE: Ansible scripts for deploying HiBench on HLRS resources
+#+AUTHOR: Sergiy Gogolenko
+#+EMAIL: gogolenko@hlrs.de
+
+* Installation
+
+- before installing Ansible, make sure that your control node satisfies minimum pre-requisites.
+  E.g., if you plan to install Ansible in a virtual environment on Ubuntu machine, run
+  #+BEGIN_SRC sh
+    sudo apt install python3 python3-venv python3-pip
+    python3 -m venv ansible
+    . ./ansible/bin/activate
+  #+END_SRC
+- install Ansible with PyPI directly
+  #+BEGIN_SRC sh
+    python3 -m pip install wheel paramiko ansible ansible_lint
+  #+END_SRC
+  or via requirements file
+- alternatively you can clone Ansible from =git://github.com/ansible/ansible.git=
+
+** Test the infrastructure
+
+- Change to the ansible folder and store your local credentials to access infrastructure
+  #+BEGIN_SRC sh
+    mkdir -p ./inventory/group_vars && echo "ansible_user: <your-hlrs-login>" > ./inventory/group_vars/HLRS.yaml
+  #+END_SRC
+
+- check if Ansible uses correct credentials to access HiDALGO HPC infrastructure in =yaml=-format
+  #+BEGIN_SRC sh
+    ansible-inventory all -i inventory --list -y | less
+  #+END_SRC
+  or in a human-readable form (option =--graph=)
+  #+BEGIN_SRC sh
+    ansible-inventory all -i inventory --graph --var
+  #+END_SRC
+- check accessibility of HiDALGO HPC infrastructure
+  #+BEGIN_SRC sh
+    ansible all -i inventory -m ping
+  #+END_SRC
+
+* Playbooks
+
+** Deployment of HiBench
+
+HiBench can be deployed with the playbook =sites.yaml=
+#+BEGIN_SRC sh
+  ansible-playbook -i inventory -l vulcan sites.yml
+#+END_SRC
+
+As long as HiBench is deployed, you can login to host and use it. E.g.,
+#+BEGIN_SRC sh
+  . ~/spack-hidalgo/hawk/share/spack/setup-env.sh 
+  spack env activate sna
+#+END_SRC
+
+* FAQ
+** How to improve Ansible Output Format
+- in order to improve readability, use =yaml= [[https://docs.ansible.com/ansible/latest/plugins/callback.html][callback plugin]].
+  #+BEGIN_SRC sh
+    ANSIBLE_LOAD_CALLBACK_PLUGINS=1 ANSIBLE_STDOUT_CALLBACK=yaml ansible ...
+    ANSIBLE_STDOUT_CALLBACK=yaml ansible-playbook ...
+  #+END_SRC
+  or append the following lines to your =~/.ansible.cfg=
+  #+BEGIN_SRC yaml
+    [defaults]
+    # Use the YAML callback plugin.
+    stdout_callback = yaml
+    # Use the stdout_callback when running ad-hoc commands.
+    bin_ansible_callbacks = True
+  #+END_SRC
