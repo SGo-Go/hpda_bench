@@ -1,6 +1,6 @@
 ############################################################
 ## @file
-## @copyright (C) 2021
+## @copyright (C) 2021 HLRS
 ##    All rights reserved.
 ##
 ## Use, modification, and distribution is subject to the license.
@@ -26,6 +26,18 @@
     hibench_tarball: './hibench-{{ hibench_version }}.tar.gz'
     # spark_prefix: '/opt/bigdata/spark_cluster/spark-2.4.6-bin-hadoop2.7'
     maven_prefix: '~/opt/apache-maven-{{ maven_version }}'
+    hibench_frameworks:
+      - hadoop
+      - spark
+    hibench_modules:
+      - micro
+      - ml
+      - sql
+      - graph
+      # - websearch # requires Apache Mahout
+      # - streaming
+      # - structuredStreaming
+      # - dal
   tasks:
 
     - name: Download new HiBench release locally
@@ -73,30 +85,43 @@
     #   when: maven_prefix is defined
       # when: spack_mirror_dir is not directory
       
-    - name: Create Maven settings folder
-      ansible.builtin.file:
-        path: '~/.m2'
-        state: directory
-        mode: '0755'
-      tags: [deploy, maven]
+    # - name: Create Maven settings folder
+    #   ansible.builtin.file:
+    #     path: '~/.m2'
+    #     state: directory
+    #     mode: '0755'
+    #   tags: [deploy, maven]
 
-    - name: Set up proxy for Maven
-      ansible.builtin.copy:
-        content: |
-          <settings>
-            <proxies>
-              <proxy>
-                <id>ssh proxy</id>
-                <active>true</active>
-                <protocol>http</protocol>
-                <host>127.0.0.1</host>
-                <port>8118</port>
-              </proxy>
-            </proxies>
-          </settings>
-        dest: '~/.m2/settings.xml'
-        # force: yes
-      tags: [deploy, maven]
+    # - name: Set up proxy for Maven
+    #   ansible.builtin.copy:
+    #     content: |
+    #       <settings>
+    #         <proxies>
+    #           <proxy>
+    #             <id>ssh proxy</id>
+    #             <active>true</active>
+    #             <protocol>http</protocol>
+    #             <host>127.0.0.1</host>
+    #             <port>8118</port>
+    #           </proxy>
+    #         </proxies>
+    #       </settings>
+    #     dest: '~/.m2/settings.xml'
+    #     # force: yes
+    #   tags: [deploy, maven]
+
+    - name: Fix URL for downloading Mahout distribution (use Apache archive instead of Cloudera)
+      ansible.builtin.lineinfile:
+        path: '{{ hibench_prefix }}/hadoopbench/mahout/pom.xml'
+        regexp: 'item.From'
+        line: 'item.To'
+        state: present
+        # backrefs: yes
+      tags: configure
+      with_items:
+       - { From: '<repo2>http://archive.cloudera.com</repo2>', To: '<repo2>https://archive.apache.org</repo2>' }
+       - { From: '<file2>cdh5/cdh/5/mahout-0.9-cdh5.1.0.tar.gz</file2>', To: '<file2>dist/mahout/0.9/mahout-distribution-0.9.tar.gz</file2>' }
+       - { From: '<checksum2>aa953e0353ac104a22d314d15c88d78f</checksum2>', To: '<checksum2>09b999fbee70c9853789ffbd8f28b8a3</checksum2>' }
 
     ###############################################################################
     # Configure benchmark (scale, tests, etc)
@@ -104,8 +129,8 @@
     - name: Set up benchmark scale profile
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/hibench.conf'
-        regexp: ^(hibench.scale.profile\s+).*
-        line: \g<1>{{ hibench_scale_profile }}
+        regexp: ^(hibench\.scale\.profile\s*).*
+        line: \g<1> {{ hibench_scale_profile }}
         backrefs: yes
       tags: configure
 
@@ -138,28 +163,38 @@
       tags: configure
 
     # Configure Hadoop to use NFS instead of HDFS
+    - name: Set Hadoop home
+      ansible.builtin.lineinfile:
+        path: '{{ hibench_prefix }}/conf/hadoop.conf'
+        regexp: ^(hibench\.hadoop\.home\s*).*$
+        line: \g<1> {{ hadoop_prefix }}
+        backrefs: yes
+      when: hadoop_prefix is defined
+      tags: [never, configure]
+
     - name: Set HDFS master
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/hadoop.conf'
-        regexp: ^(hibench.hdfs.master\s+).*
-        line: \g<1>file://{{ nfs_path }}
+        regexp: ^(hibench\.hdfs\.master\s*).*$
+        line: \g<1> file://{{ nfs_path }}
         backrefs: yes
       tags: configure
 
     # Configure Spark
-    # - name: Set Spark home
-    #   ansible.builtin.lineinfile:
-    #     path: '{{ hibench_prefix }}/conf/spark.conf'
-    #     regexp: ^(hibench.spark.home\s+).*
-    #     line: \g<1>{{ spark_prefix }}
-    #     backrefs: yes
-    #   tags: [never, configure]
+    - name: Set Spark home
+      ansible.builtin.lineinfile:
+        path: '{{ hibench_prefix }}/conf/spark.conf'
+        regexp: ^(hibench\.spark\.home\s*).*$
+        line: \g<1> {{ spark_prefix }}
+        backrefs: yes
+      when: spark_prefix is defined
+      tags: [never, configure]
     
     - name: Set default Spark master to local[*]
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/spark.conf'
-        regexp: ^(hibench.spark.master\s+).*
-        line: \g<1>local[*]
+        regexp: ^(hibench\.spark\.master\s*).*$
+        line: \g<1> local[*]
         backrefs: yes
       tags: configure
 
@@ -173,56 +208,56 @@
     - name: Set Spark checkpoint path
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/spark.conf'
-        regexp: ^(hibench.streambench.spark.checkpointPath\s+).*
-        line: \g<1>{{ spark_checkpointing_path }}
+        regexp: ^(hibench\.streambench\.spark\.checkpointPath\s*).*$
+        line: \g<1> {{ spark_checkpointing_path }}
         backrefs: yes
       tags: configure
 
     - name: Set default Spark master to localhost
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/spark.conf'
-        regexp: ^(hibench.masters.hostnames\s+).*
-        line: \g<1>localhost
+        regexp: ^(hibench\.masters\.hostnames\s*).*$
+        line: \g<1> localhost
         backrefs: yes
       tags: configure
 
     - name: Set default Spark slave to localhost
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/spark.conf'
-        regexp: ^(hibench.slaves.hostnames\s+).*
-        line: \g<1>localhost
+        regexp: ^(hibench\.slaves\.hostnames\s*).*$
+        line: \g<1> localhost
         backrefs: yes
       tags: configure
 
     - name: Set number of YARN executors
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/spark.conf'
-        regexp: ^(hibench.yarn.executor.num\s+).*
-        line: \g<1>{{ hibench_yarn_num_executors }}
+        regexp: ^(hibench\.yarn\.executor\.num\s*).*$
+        line: \g<1> {{ hibench_yarn_num_executors }}
         backrefs: yes
       tags: configure
 
     - name: Set number of cores per YARN executor
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/spark.conf'
-        regexp: ^(hibench.yarn.executor.cores\s+).*
-        line: \g<1>{{ hibench_yarn_num_cores }}
+        regexp: ^(hibench\.yarn\.executor\.cores\s*).*$
+        line: \g<1> {{ hibench_yarn_num_cores }}
         backrefs: yes
       tags: configure
 
     - name: Set executor memory size
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/spark.conf'
-        regexp: ^(spark.executor.memory\s+).*
-        line: \g<1>{{ hibench_memory }}
+        regexp: ^(spark\.executor\.memory\s*).*$
+        line: \g<1> {{ hibench_memory }}
         backrefs: yes
       tags: configure
 
     - name: Set driver memory size
       ansible.builtin.lineinfile:
         path: '{{ hibench_prefix }}/conf/spark.conf'
-        regexp: ^(spark.driver.memory\s+).*
-        line: \g<1>{{ hibench_memory }}
+        regexp: ^(spark\.driver\.memory\s*).*$
+        line: \g<1> {{ hibench_memory }}
         backrefs: yes
       tags: configure
 
