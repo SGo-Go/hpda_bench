@@ -68,3 +68,5 @@ As long as HiBench is deployed, you can login to host and use it. E.g.,
     # Use the stdout_callback when running ad-hoc commands.
     bin_ansible_callbacks = True
   #+END_SRC
+** How to access Internet from HWW environments via proxy
+- Internet access through SSH: https://insane.hlrs.de/proxies.html

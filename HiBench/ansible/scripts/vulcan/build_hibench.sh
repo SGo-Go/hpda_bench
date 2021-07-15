@@ -14,6 +14,8 @@
 [[ -z "$SPARK_HOME" ]] && module load bigdata/spark_cluster && init-spark
 
 export HIBENCH_HOME={{ hibench_prefix }}
+# current_dir=`dirname "$0"`
+# export HIBENCH_HOME=`cd "${current_dir}/.."; dirname $(pwd)`
 export PATH=$PATH:{{ maven_prefix }}/bin
 
 HADOOP_VERSION=$(hadoop version | grep -e ^Hadoop\\s*\.*\$ | sed -E "s/(^Hadoop\s+)([\.0-9]+).*/\2/")
