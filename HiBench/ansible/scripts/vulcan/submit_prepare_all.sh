@@ -7,6 +7,7 @@ ALL_SCALES=${1:-{{ hibench_default_scales | join(' ') }}}
 current_dir=`dirname "$0"`
 root_dir=`cd "${current_dir}/.."; pwd`
 
+. ${root_dir}/bin/init_hibench.sh
 for TEST_SCALE in ${ALL_SCALES}
 do
     TEST_INPUT_PATH={{ nfs_path }}/${TEST_SCALE}

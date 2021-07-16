@@ -17,7 +17,6 @@
   vars:
     hibench_version: '7.1.1'
     maven_version: '3.8.1'
-    hibench_scale_profile: small
     hibench_yarn_num_executors: 1 # number of YARN executors is one less than the number of slaves
     hibench_yarn_num_cores: 36
     hibench_memory: 300g
@@ -45,6 +44,7 @@
       # - huge
       # - gigantic
       # - bigdata
+    hibench_scale_profile: small
   tasks:
 
     - name: Download new HiBench release locally
@@ -141,10 +141,17 @@
     # Configure Hadoop and Spark to use NFS
     ###############################################################################
     # Reuse default config templates 
+    - name: Create folder for default configs at the given system
+      ansible.builtin.file:
+        path: '{{ hibench_prefix }}/conf/templates'
+        state: directory
+        mode: '0755'
+      tags: configure
+
     - name: Reuse default templates for configs ("spark.conf", "hadoop.conf")
       ansible.builtin.copy:
         src: '{{ hibench_prefix }}/conf/{{ item }}.template'
-        dest: '{{ hibench_prefix }}/conf/{{ item }}'
+        dest: '{{ hibench_prefix }}/conf/templates/{{ item }}'
         remote_src: yes
       loop:
         - hadoop.conf
@@ -154,7 +161,7 @@
     # Configure Hadoop to use NFS instead of HDFS
     - name: Set Hadoop home
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/hadoop.conf'
+        path: '{{ hibench_prefix }}/conf/templates/hadoop.conf'
         regexp: ^(hibench\.hadoop\.home\s*).*$
         line: \g<1> {{ hadoop_prefix }}
         backrefs: yes
@@ -163,7 +170,7 @@
 
     - name: Set HDFS master
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/hadoop.conf'
+        path: '{{ hibench_prefix }}/conf/templates/hadoop.conf'
         regexp: ^(hibench\.hdfs\.master\s*).*$
         line: \g<1> file://{{ nfs_path }}
         backrefs: yes
@@ -172,7 +179,7 @@
     # Configure Spark
     - name: Set Spark home
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(hibench\.spark\.home\s*).*$
         line: \g<1> {{ spark_prefix }}
         backrefs: yes
@@ -181,7 +188,7 @@
     
     - name: Set default Spark master to local[*]
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(hibench\.spark\.master\s*).*$
         line: \g<1> local[*]
         backrefs: yes
@@ -196,7 +203,7 @@
     
     - name: Set Spark checkpoint path
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(hibench\.streambench\.spark\.checkpointPath\s*).*$
         line: \g<1> {{ spark_checkpointing_path }}
         backrefs: yes
@@ -204,7 +211,7 @@
 
     - name: Set default Spark master to localhost
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(hibench\.masters\.hostnames\s*).*$
         line: \g<1> localhost
         backrefs: yes
@@ -212,7 +219,7 @@
 
     - name: Set default Spark slave to localhost
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(hibench\.slaves\.hostnames\s*).*$
         line: \g<1> localhost
         backrefs: yes
@@ -220,7 +227,7 @@
 
     - name: Set number of YARN executors
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(hibench\.yarn\.executor\.num\s*).*$
         line: \g<1> {{ hibench_yarn_num_executors }}
         backrefs: yes
@@ -228,7 +235,7 @@
 
     - name: Set number of cores per YARN executor
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(hibench\.yarn\.executor\.cores\s*).*$
         line: \g<1> {{ hibench_yarn_num_cores }}
         backrefs: yes
@@ -236,7 +243,7 @@
 
     - name: Set executor memory size
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(spark\.executor\.memory\s*).*$
         line: \g<1> {{ hibench_memory }}
         backrefs: yes
@@ -244,7 +251,7 @@
 
     - name: Set driver memory size
       ansible.builtin.lineinfile:
-        path: '{{ hibench_prefix }}/conf/spark.conf'
+        path: '{{ hibench_prefix }}/conf/templates/spark.conf'
         regexp: ^(spark\.driver\.memory\s*).*$
         line: \g<1> {{ hibench_memory }}
         backrefs: yes
@@ -258,42 +265,42 @@
         src: scripts/{{ inventory_hostname }}/init_hibench.sh
         dest: '{{ hibench_prefix }}/bin/init_hibench.sh'
         mode: u=rwx,g=rx,o=r
-      tags: script
+      tags: [script, configure]
 
     - name: Prepare script to build HiBench
       ansible.builtin.template:
         src: scripts/{{ inventory_hostname }}/build_hibench.sh
         dest: '{{ hibench_prefix }}/bin/build_hibench.sh'
         mode: u=rwx,g=rx,o=r
-      tags: script
+      tags: [script, configure]
 
     - name: Copy script for preparing inputs
       ansible.builtin.template:
         src: scripts/{{ inventory_hostname }}/prepare.sh
         dest: '{{ hibench_prefix }}/bin/prepare.sh'
         mode: u=rwx,g=rx,o=r
-      tags: script
+      tags: [script, configure]
 
     - name: Copy script for submitting job that prepares inputs
       ansible.builtin.template:
         src: scripts/{{ inventory_hostname }}/submit_prepare_all.sh
         dest: '{{ hibench_prefix }}/bin/submit_prepare_all.sh'
         mode: u=rwx,g=rx,o=r
-      tags: script
+      tags: [script, configure]
 
     - name: Copy script for running benchmark
       ansible.builtin.template:
         src: scripts/{{ inventory_hostname }}/run.sh
         dest: '{{ hibench_prefix }}/bin/run.sh'
         mode: u=rwx,g=rx,o=r
-      tags: script
+      tags: [script, configure]
 
     - name: Copy script for submitting job that runs benchmark
       ansible.builtin.template:
         src: scripts/{{ inventory_hostname }}/submit_run_all.sh
         dest: '{{ hibench_prefix }}/bin/submit_run_all.sh'
         mode: u=rwx,g=rx,o=r
-      tags: script
+      tags: [script, configure]
 
     ###############################################################################
     # Set up internet access at the remote environment
